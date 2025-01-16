@@ -1,5 +1,6 @@
 streamlit
 pandas
-openpyxl
-google-cloud-aiplatform
-pyyaml
+google-generativeai
+PyYAML
+ortools
+xlsxwriter
