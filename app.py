@@ -57,10 +57,10 @@ def login():
 
     # Đặt tiêu đề tổng quát ở đầu trang (tuỳ ý)
     st.markdown("""
-        <h2 style='text-align: center; color: #31333F;'>
+        <h2 style='text-align: center; color: #FFFFFF;'>
             [MSS] Work Schedule Manager
         </h2>
-        <p style='text-align: center; color: #616161; margin-top: -10px;'>
+        <p style='text-align: center; color: #FFFFFF; margin-top: -10px;'>
             Vui lòng đăng nhập để sử dụng hệ thống
         </p>
     """, unsafe_allow_html=True)
@@ -136,7 +136,7 @@ def login():
     with st.container():
         st.markdown("<div class='login-box'>", unsafe_allow_html=True)
 
-        st.markdown("<div class='login-title'>Đăng Nhập</div>", unsafe_allow_html=True)
+        st.markdown("<div class='login-title' style='color: #FFFFFF;'>Đăng Nhập</div>", unsafe_allow_html=True)
 
         # Input username / password
         username = st.text_input("Tên đăng nhập").strip()
