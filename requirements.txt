@@ -4,3 +4,4 @@ google-generativeai
 PyYAML
 ortools
 xlsxwriter
+openpyxl
