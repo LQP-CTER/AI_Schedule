@@ -55,22 +55,103 @@ def login():
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
 
-    st.title("Work Schedule Manager - Login")
+    # Đặt tiêu đề tổng quát ở đầu trang (tuỳ ý)
+    st.markdown("""
+        <h2 style='text-align: center; color: #31333F;'>
+            [MSS] Work Schedule Manager
+        </h2>
+        <p style='text-align: center; color: #616161; margin-top: -10px;'>
+            Vui lòng đăng nhập để sử dụng hệ thống
+        </p>
+    """, unsafe_allow_html=True)
+
+    # Logo hoặc hình minh hoạ (nếu muốn)
+    # st.image("logo.png", width=120)  # Chỉnh đường dẫn/logo tùy nhu cầu
+
+    # Nhúng CSS để tạo background và một box login chính giữa
+    st.markdown("""
+        <style>
+            /* Toàn trang: có thể đổi màu hoặc gradient tuỳ ý */
+            body {
+                background: linear-gradient(to right, #ECE9E6, #FFFFFF);
+            }
+
+            /* Tạo một box chính giữa màn hình cho form đăng nhập */
+            .login-box {
+                margin: 0 auto;           /* canh giữa */
+                max-width: 380px;         /* độ rộng tối đa của box */
+                background-color: rgba(255, 255, 255, 0.85); 
+                backdrop-filter: blur(5px); /* hiệu ứng mờ nền */
+                padding: 30px;
+                border-radius: 10px;
+                box-shadow: 0 3px 6px rgba(0,0,0,0.16);
+                text-align: center;
+            }
+
+            .login-title {
+                font-size: 22px;
+                font-weight: 600;
+                color: #31333F;
+                margin-bottom: 20px;
+            }
+
+            /* Tuỳ chọn style cho phần input */
+            .stTextInput>div>div>input {
+                padding: 10px;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                width: 100%;
+            }
+
+            /* Tuỳ chọn style cho nút đăng nhập */
+            .login-button {
+                width: 100%;
+                height: 45px;
+                background-color: #31333F;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 5px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                margin-top: 10px;
+            }
+
+            .login-button:hover {
+                background-color: #50525C;
+            }
+
+            /* Ẩn menu hamburger và "Made with Streamlit" footer (tuỳ chọn) */
+            /* .css-1rs6os edgvbvh3 { visibility: hidden; } */
+            /* footer {visibility: hidden;} */
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Load credentials từ file credentials.yaml
     credentials = load_credentials()
     if not credentials:
         return False
 
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    # Tạo container hiển thị box đăng nhập
+    with st.container():
+        st.markdown("<div class='login-box'>", unsafe_allow_html=True)
 
-    if st.button("Login"):
-        if username in credentials and credentials[username] == password:
-            st.session_state.logged_in = True
-            st.success("Login successful!")
-            st.rerun()
-        else:
-            st.error("Invalid username or password")
-            return False
+        st.markdown("<div class='login-title'>Đăng Nhập</div>", unsafe_allow_html=True)
+
+        # Input username / password
+        username = st.text_input("Tên đăng nhập").strip()
+        password = st.text_input("Mật khẩu", type="password")
+
+        # Nút Login
+        if st.button("Đăng nhập", key="login-button"):
+            if username in credentials and credentials[username] == password:
+                st.session_state.logged_in = True
+                st.success("Đăng nhập thành công!")
+                st.rerun()
+            else:
+                st.error("Tên đăng nhập hoặc mật khẩu không đúng.")
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
     return st.session_state.logged_in
 
@@ -408,7 +489,7 @@ def display_schedule(df):
 
 
 def main_app():
-    st.title("Work Schedule Manager")
+    st.title("[MSS] Create a work schedule")
 
     st.markdown('<div id="user-manual-section"></div>', unsafe_allow_html=True)
 
@@ -424,17 +505,15 @@ def main_app():
     """
 
     # === 5) HIỂN THỊ BẢNG HƯỚNG DẪN TRONG EXPANDER ===
-    with st.expander("User Manual", expanded=False):
+    with st.expander("Hướng dẫn sử dụng", expanded=False):
         st.markdown("""
         ### Hướng Dẫn Sử Dụng (Dạng Bảng)
         Bấm vào từng bước dưới đây để tham khảo chi tiết cách dùng:
         """)
         st.markdown(user_manual_table)
 
-    # === 6) LẤY CÁC YÊU CẦU LẬP LỊCH TỪ SIDEBAR ===
     requirements = get_scheduling_requirements()
 
-    # === 7) UPLOAD FILE ĐỂ LẬP LỊCH ===
     uploaded_file = st.file_uploader("Upload Schedule Data", type=['xlsx', 'csv'])
 
     if uploaded_file:
@@ -468,7 +547,6 @@ def main_app():
                                 mime="text/csv"
                             )
 
-                            # Download Excel
                             buffer = io.BytesIO()
                             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                                 optimized_schedule.to_excel(writer, index=False)
@@ -491,15 +569,12 @@ def main_app():
             st.error(f"Error reading file: {str(e)}")
             st.error("Please make sure the file is not corrupted and has the correct format")
 
-    # Thêm đường kẻ ngang ở sidebar
     st.sidebar.markdown("---")
 
-    # Nút Logout (nếu muốn giữ)
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
         st.rerun()
 
-    # === 8) FOOTER HIỂN THỊ NAME TAG Ở CUỐI TRANG ===
     st.markdown(
         """
         <style>
