@@ -9,22 +9,21 @@ from config import GOOGLE_API_KEY
 import re
 import json
 
-# Kiểm tra và import xlsxwriter
+#------------------------------------------------------------------------------
 try:
     import xlsxwriter
 except ImportError:
     import sys
-    st.error("Module 'xlsxwriter' is missing. Please install by running 'pip install xlsxwriter'.")
+
+    st.error("Module 'xlsxwriter' is missing. Vui lòng cài đặt bằng: pip install xlsxwriter")
     sys.exit(1)
 
-
-# Configure Google AI
 if not GOOGLE_API_KEY:
-    raise ValueError("API Key not found. Please check config.py")
+    raise ValueError("API Key không tồn tại. Vui lòng kiểm tra file config.py")
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# Configure generation parameters
+# Các thông số generate cho Google Generative AI
 generation_config = {
     "temperature": 0.9,
     "top_p": 1,
@@ -37,25 +36,26 @@ model = genai.GenerativeModel(
     generation_config=generation_config
 )
 
-
 def load_credentials():
+
     try:
         with open('credentials.yaml') as file:
             credentials = yaml.safe_load(file)
             return credentials
     except FileNotFoundError:
-        st.error("Credentials file not found. Please create credentials.yaml")
+        st.error("File credentials.yaml không tồn tại. Vui lòng tạo file.")
         return {}
     except yaml.YAMLError as e:
-        st.error(f"Error reading credentials file: {e}")
+        st.error(f"Lỗi khi đọc credentials.yaml: {e}")
         return {}
 
 
 def login():
+
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
 
-    # Đặt tiêu đề tổng quát ở đầu trang (tuỳ ý)
+    # Giao diện tiêu đề
     st.markdown("""
         <h2 style='text-align: center; color: #FFFFFF;'>
             [MSS] Work Schedule Manager
@@ -65,45 +65,34 @@ def login():
         </p>
     """, unsafe_allow_html=True)
 
-    # Logo hoặc hình minh hoạ (nếu muốn)
-    # st.image("logo.png", width=120)  # Chỉnh đường dẫn/logo tùy nhu cầu
-
-    # Nhúng CSS để tạo background và một box login chính giữa
+    # CSS cho background và form login
     st.markdown("""
         <style>
-            /* Toàn trang: có thể đổi màu hoặc gradient tuỳ ý */
             body {
                 background: linear-gradient(to right, #ECE9E6, #FFFFFF);
             }
-
-            /* Tạo một box chính giữa màn hình cho form đăng nhập */
             .login-box {
-                margin: 0 auto;           /* canh giữa */
-                max-width: 380px;         /* độ rộng tối đa của box */
+                margin: 0 auto;           
+                max-width: 380px;         
                 background-color: rgba(255, 255, 255, 0.85); 
-                backdrop-filter: blur(5px); /* hiệu ứng mờ nền */
+                backdrop-filter: blur(5px);
                 padding: 30px;
                 border-radius: 10px;
                 box-shadow: 0 3px 6px rgba(0,0,0,0.16);
                 text-align: center;
             }
-
             .login-title {
                 font-size: 22px;
                 font-weight: 600;
                 color: #31333F;
                 margin-bottom: 20px;
             }
-
-            /* Tuỳ chọn style cho phần input */
             .stTextInput>div>div>input {
                 padding: 10px;
                 border: 1px solid #ccc;
                 border-radius: 5px;
                 width: 100%;
             }
-
-            /* Tuỳ chọn style cho nút đăng nhập */
             .login-button {
                 width: 100%;
                 height: 45px;
@@ -116,33 +105,25 @@ def login():
                 cursor: pointer;
                 margin-top: 10px;
             }
-
             .login-button:hover {
                 background-color: #50525C;
             }
-
-            /* Ẩn menu hamburger và "Made with Streamlit" footer (tuỳ chọn) */
-            /* .css-1rs6os edgvbvh3 { visibility: hidden; } */
-            /* footer {visibility: hidden;} */
         </style>
     """, unsafe_allow_html=True)
 
-    # Load credentials từ file credentials.yaml
+    # Load credentials
     credentials = load_credentials()
     if not credentials:
         return False
 
-    # Tạo container hiển thị box đăng nhập
+    # Form đăng nhập
     with st.container():
         st.markdown("<div class='login-box'>", unsafe_allow_html=True)
-
         st.markdown("<div class='login-title' style='color: #FFFFFF;'>Đăng Nhập</div>", unsafe_allow_html=True)
 
-        # Input username / password
         username = st.text_input("Tên đăng nhập").strip()
         password = st.text_input("Mật khẩu", type="password")
 
-        # Nút Login
         if st.button("Đăng nhập", key="login-button"):
             if username in credentials and credentials[username] == password:
                 st.session_state.logged_in = True
@@ -155,8 +136,8 @@ def login():
 
     return st.session_state.logged_in
 
-
 def get_scheduling_requirements():
+
     st.sidebar.subheader("Điều Kiện Lập Lịch")
 
     requirements = {
@@ -173,20 +154,14 @@ def get_scheduling_requirements():
         },
         "preferences_weight": st.sidebar.slider("Mức độ ưu tiên nguyện vọng nhân viên", 0.0, 1.0, 0.5)
     }
-
     return requirements
 
-
 def fallback_analyze_note(note):
-    """
-    Phân tích cơ bản dựa trên từ khóa khi AI không trả về kết quả hợp lệ.
-    """
     note_lower = note.lower()
     priority = 0
     preferred = []
     avoid = []
 
-    # Ưu tiên / tránh ca sáng
     if 'ca sáng' in note_lower:
         if any(word in note_lower for word in ['muốn', 'thích', 'được']):
             preferred.append('Ca sáng')
@@ -214,15 +189,13 @@ def fallback_analyze_note(note):
 
 
 def parse_ai_response(text):
-    """
-    Tách chuỗi JSON từ phản hồi AI và chuẩn hóa kết quả
-    """
+
     match = re.search(r'\{.*\}', text, re.DOTALL)
     if not match:
-        raise ValueError("No JSON object found in AI response.")
+        raise ValueError("Không tìm thấy JSON object trong phản hồi AI.")
 
     json_str = match.group(0)
-    json_str = json_str.replace("'", '"')
+    json_str = json_str.replace("'", '"')  # Đổi dấu nháy đơn thành nháy kép
 
     parsed = json.loads(json_str)
 
@@ -246,15 +219,6 @@ def parse_ai_response(text):
 
 
 def analyze_note(note, model, max_retries=2):
-    """
-    Phân tích ghi chú của nhân viên qua AI, trả về dict:
-    {
-        "priority": int [0..10],
-        "preferred_shifts": list[str],
-        "avoid_shifts": list[str]
-    }
-    Nếu AI trả về sai định dạng hoặc không thành công sau N lần thử -> fallback_analyze_note
-    """
 
     if pd.isna(note) or note.strip() == '':
         return {'priority': 0, 'preferred_shifts': [], 'avoid_shifts': []}
@@ -298,17 +262,16 @@ Bây giờ, hãy phân tích ghi chú này: "{note}"
             if attempt < max_retries - 1:
                 continue
             else:
-                st.warning(f"Lỗi AI parse lần {attempt+1}: {e}. Fallback sang từ khóa cho ghi chú: {note}")
+                st.warning(f"Lỗi AI parse lần {attempt + 1}: {e}. Fallback sang từ khóa cho ghi chú: {note}")
                 return fallback_analyze_note(note)
 
-
 def process_schedule_data(df, model):
+
     processed_data = []
 
     try:
         week_col = [col for col in df.columns if 'tuần' in col.lower()][0]
         week_value = df[week_col].iloc[0]
-
         try:
             start_date = pd.to_datetime(week_value, format='%d/%m/%Y')
         except:
@@ -316,18 +279,27 @@ def process_schedule_data(df, model):
                 start_date = pd.to_datetime(week_value, format='%Y-%m-%d')
             except:
                 start_date = pd.Timestamp.now().normalize()
-                st.warning(f"Không thể xác định ngày từ giá trị '{week_value}'. Sử dụng ngày hiện tại làm mặc định.")
+                st.warning(f"Không thể xác định ngày từ giá trị '{week_value}'. Sử dụng ngày hiện tại.")
     except:
         start_date = pd.Timestamp.now().normalize()
-        st.warning("Không tìm thấy cột chứa thông tin tuần. Sử dụng ngày hiện tại làm mặc định.")
+        st.warning("Không tìm thấy cột chứa thông tin tuần. Sử dụng ngày hiện tại.")
 
     day_columns = [
         col for col in df.columns
         if any(day in col.lower() for day in ['thứ 2', 'thứ 3', 'thứ 4', 'thứ 5', 'thứ 6', 'thứ 7', 'chủ nhật'])
     ]
+    if not day_columns:
+        st.warning("Không tìm thấy cột chứa Thứ 2...Chủ Nhật.")
 
-    employee_col = [col for col in df.columns if 'tên' in col.lower() and 'viên' in col.lower()][0]
-    note_col = [col for col in df.columns if 'ghi chú' in col.lower()][0]
+    employee_cols = [col for col in df.columns if 'tên' in col.lower() and 'viên' in col.lower()]
+    if not employee_cols:
+        raise ValueError("Không tìm thấy cột Tên nhân viên (VD: 'Tên nhân viên').")
+    employee_col = employee_cols[0]
+
+    note_cols = [col for col in df.columns if 'ghi chú' in col.lower()]
+    if not note_cols:
+        raise ValueError("Không tìm thấy cột Ghi chú.")
+    note_col = note_cols[0]
 
     for _, row in df.iterrows():
         employee = row[employee_col]
@@ -371,7 +343,6 @@ def process_schedule_data(df, model):
 
     return pd.DataFrame(processed_data)
 
-
 def optimize_schedule(availability_df, requirements):
     model_cp = cp_model.CpModel()
     solver = cp_model.CpSolver()
@@ -390,8 +361,8 @@ def optimize_schedule(availability_df, requirements):
     for date in dates:
         for shift in shifts:
             for emp in employees:
-                emp_data = availability_df[
-                    (availability_df['Date'] == date) &
+                emp_data = availability_df[(
+                    availability_df['Date'] == date) &
                     (availability_df['Employee'] == emp) &
                     (availability_df['Shift'] == shift)
                 ]
@@ -410,28 +381,21 @@ def optimize_schedule(availability_df, requirements):
     for date in dates:
         for shift in shifts:
             model_cp.Add(
-                sum(shift_vars[(date, shift, emp)] for emp in employees) ==
-                requirements['staff_per_shift'][shift]
+                sum(shift_vars[(date, shift, emp)] for emp in employees)
+                == requirements['staff_per_shift'][shift]
             )
 
         for emp in employees:
             model_cp.Add(
-                sum(shift_vars[(date, shift, emp)] for shift in shifts) <=
-                requirements['max_shifts_per_day']
+                sum(shift_vars[(date, shift, emp)] for shift in shifts)
+                <= requirements['max_shifts_per_day']
             )
 
-    for emp in employees:
-        total_shifts = sum(
-            shift_vars[(date, shift, emp)]
-            for date in dates
-            for shift in shifts
-        )
-        model_cp.Add(total_shifts >= 4)
-        model_cp.Add(total_shifts <= 6)
-
-    available_shifts = availability_df[availability_df['Available']] \
-        .groupby(['Date', 'Employee'])['Shift'].apply(list).to_dict()
-
+    available_shifts = (
+        availability_df[availability_df['Available']]
+        .groupby(['Date', 'Employee'])['Shift'].apply(list)
+        .to_dict()
+    )
     for date in dates:
         for emp in employees:
             for shift in shifts:
@@ -439,13 +403,13 @@ def optimize_schedule(availability_df, requirements):
                     model_cp.Add(shift_vars[(date, shift, emp)] == 0)
 
     status = solver.Solve(model_cp)
-
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
         schedule_data = []
         for date in dates:
             row = {'Date': date}
             for shift in shifts:
                 assigned = [emp for emp in employees if solver.Value(shift_vars[(date, shift, emp)]) == 1]
+                # Lưu thông tin theo dạng cột: Ca sáng_1, Ca sáng_2...
                 for i in range(requirements['staff_per_shift'][shift]):
                     row[f'{shift}_{i + 1}'] = assigned[i] if i < len(assigned) else ''
             schedule_data.append(row)
@@ -453,16 +417,8 @@ def optimize_schedule(availability_df, requirements):
     else:
         raise Exception("Không tìm được giải pháp khả thi. Vui lòng kiểm tra lại các ràng buộc.")
 
-
-def clean_note(note):
-    if pd.isna(note) or note == '':
-        return ''
-    note = re.sub(r'[^\w\s\-:,]', ' ', note)
-    note = ' '.join(note.split())
-    return note
-
-
 def display_schedule(df):
+
     st.write("### Lịch Làm Việc")
 
     max_staff = max(
@@ -481,11 +437,47 @@ def display_schedule(df):
 
     for _, row in df.iterrows():
         cols = st.columns(num_cols)
+        # Cột 0: ngày
         cols[0].write(row['Date'].strftime('%Y-%m-%d'))
-
         for i in range(max_staff):
             cols[i + 1].write(row.get(f'Ca sáng_{i + 1}', ''))
             cols[i + 1 + max_staff].write(row.get(f'Ca chiều_{i + 1}', ''))
+
+def dropdown_filter_ui(df: pd.DataFrame) -> pd.DataFrame:
+    st.subheader("Lọc dữ liệu (Dropdown)")
+
+    columns = df.columns.tolist()
+    if not columns:
+        st.warning("DataFrame không có cột nào để lọc.")
+        return df
+
+    chosen_col = st.selectbox("Chọn cột muốn lọc", columns)
+
+    unique_values = df[chosen_col].dropna().unique().tolist()
+    unique_values.sort()
+
+    if unique_values:
+        chosen_value = st.selectbox("Chọn giá trị để lọc", unique_values)
+    else:
+        chosen_value = None
+        st.warning("Cột đã chọn không có giá trị nào (hoặc toàn NaN).")
+
+    if st.button("Áp dụng lọc"):
+        if chosen_value is None:
+            st.warning("Không có giá trị để lọc.")
+            st.session_state.filtered_df = df  # Lưu DataFrame gốc nếu không có lọc
+            return df
+        else:
+            df_filtered = df[df[chosen_col] == chosen_value]
+            df_filtered = df_filtered.drop_duplicates()
+            st.success(f"Đã lọc thành công (giữ những hàng có {chosen_col} == {chosen_value}).")
+            st.session_state.filtered_df = df_filtered  # Lưu DataFrame đã lọc
+            return df_filtered
+    else:
+        if st.session_state.filtered_df is not None:
+            return st.session_state.filtered_df
+        return df
+
 
 
 def main_app():
@@ -493,6 +485,10 @@ def main_app():
 
     st.markdown('<div id="user-manual-section"></div>', unsafe_allow_html=True)
 
+    if 'filtered_df' not in st.session_state:
+        st.session_state.filtered_df = None
+
+    # Bảng hướng dẫn
     user_manual_table = """
     | **Bước** | **Mục tiêu**                                   | **Hành động**                                                                                                                                         |
     |----------|------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -504,91 +500,105 @@ def main_app():
     | 6        | **Kiểm Tra Lỗi**                               | - Nếu gặp **Error** (ví dụ, không đủ người cho mỗi ca), ứng dụng sẽ báo lỗi. Hãy điều chỉnh lại **Điều Kiện Lập Lịch** hoặc **File dữ liệu** rồi **Generate** lại.                                                                                                                                            |
     """
 
-    # === 5) HIỂN THỊ BẢNG HƯỚNG DẪN TRONG EXPANDER ===
+    # Hiển thị bảng hướng dẫn
     with st.expander("Hướng dẫn sử dụng", expanded=False):
-        st.markdown("""
-        ### Hướng Dẫn Sử Dụng (Dạng Bảng)
-        Bấm vào từng bước dưới đây để tham khảo chi tiết cách dùng:
-        """)
+        st.markdown("### Hướng Dẫn Sử Dụng (Dạng Bảng)")
         st.markdown(user_manual_table)
 
+    # Lấy requirements
     requirements = get_scheduling_requirements()
 
+    # Upload file
     uploaded_file = st.file_uploader("Upload Schedule Data", type=['xlsx', 'csv'])
 
     if uploaded_file:
         try:
-            if uploaded_file.name.endswith('.xlsx'):
-                df = pd.read_excel(uploaded_file)
+            # Đọc file
+            if uploaded_file.name.lower().endswith('.xlsx'):
+                xls = pd.ExcelFile(uploaded_file)
+                sheet_list = xls.sheet_names
+                chosen_sheet = st.selectbox("Chọn sheet để đọc dữ liệu:", sheet_list)
+                df = pd.read_excel(uploaded_file, sheet_name=chosen_sheet)
             else:
                 df = pd.read_csv(uploaded_file)
 
             st.write("### Raw Input Data")
             st.dataframe(df)
 
-            try:
-                processed_df = process_schedule_data(df, model)
-                st.write("### Processed Schedule Data")
-                st.dataframe(processed_df)
+            df_filtered = dropdown_filter_ui(df)
+            st.write("### Dữ liệu sau khi lọc")
+            st.dataframe(df_filtered)
 
-                if st.button("Generate Schedule"):
-                    with st.spinner("Optimizing schedule..."):
-                        try:
-                            optimized_schedule = optimize_schedule(processed_df, requirements)
-                            display_schedule(optimized_schedule)
+            if not df_filtered.empty:
+                try:
+                    processed_df = process_schedule_data(df_filtered, model)
+                    st.write("### Processed Schedule Data")
+                    st.dataframe(processed_df)
 
-                            col1, col2 = st.columns(2)
-                            # Download CSV
-                            csv = optimized_schedule.to_csv(index=False)
-                            col1.download_button(
-                                label="Download Schedule (CSV)",
-                                data=csv,
-                                file_name="optimized_schedule.csv",
-                                mime="text/csv"
-                            )
+                    if st.button("Generate Schedule"):
+                        with st.spinner("Optimizing schedule..."):
+                            try:
+                                # Tạo lịch từ dữ liệu đã lọc
+                                optimized_schedule = optimize_schedule(processed_df, requirements)
+                                display_schedule(optimized_schedule)
 
-                            buffer = io.BytesIO()
-                            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                                optimized_schedule.to_excel(writer, index=False)
-                            col2.download_button(
-                                label="Download Schedule (Excel)",
-                                data=buffer.getvalue(),
-                                file_name="optimized_schedule.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            )
+                                # Cho phép download
+                                col1, col2 = st.columns(2)
 
-                        except Exception as e:
-                            st.error(f"Error generating schedule: {str(e)}")
-                            st.error("Please check if the input data meets all requirements")
+                                # Download CSV
+                                csv = optimized_schedule.to_csv(index=False)
+                                col1.download_button(
+                                    label="Download Schedule (CSV)",
+                                    data=csv,
+                                    file_name="optimized_schedule.csv",
+                                    mime="text/csv"
+                                )
 
-            except Exception as e:
-                st.error(f"Error processing schedule data: {str(e)}")
-                st.error("Please check if the input file has the correct format")
+                                # Download Excel
+                                buffer = io.BytesIO()
+                                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                                    optimized_schedule.to_excel(writer, index=False)
+                                col2.download_button(
+                                    label="Download Schedule (Excel)",
+                                    data=buffer.getvalue(),
+                                    file_name="optimized_schedule.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                )
 
+                            except Exception as e:
+                                st.error(f"Error generating schedule: {str(e)}")
+                                st.error("Hãy kiểm tra dữ liệu đầu vào hoặc các ràng buộc lịch.")
+                except Exception as e:
+                    st.error(f"Error processing schedule data: {str(e)}")
+                    st.error("Vui lòng kiểm tra format file hoặc cột dữ liệu.")
+            else:
+                st.error("Dữ liệu sau khi lọc đang rỗng, không thể tạo lịch.")
         except Exception as e:
             st.error(f"Error reading file: {str(e)}")
-            st.error("Please make sure the file is not corrupted and has the correct format")
+            st.error("Vui lòng kiểm tra file (có thể bị lỗi hoặc sai định dạng).")
 
     st.sidebar.markdown("---")
 
+    # Nút Logout
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
         st.rerun()
 
+    # Footer
     st.markdown(
         """
         <style>
         .footer {
             position: fixed;
-            right: 10px;        
-            bottom: 10px;       
-            background-color: #222222; 
-            color: #FFFFFF;        
-            padding: 6px 12px;  
-            border-radius: 8px; 
-            font-size: 14px;    
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1); 
-            z-index: 9999;      
+            right: 10px;
+            bottom: 10px;
+            background-color: #222222;
+            color: #FFFFFF;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            z-index: 9999;
         }
         </style>
         <div class="footer">
@@ -597,7 +607,6 @@ def main_app():
         """,
         unsafe_allow_html=True
     )
-
 
 def main():
     if 'logged_in' not in st.session_state:
